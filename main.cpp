@@ -70,8 +70,8 @@ static std::vector<unsigned char> window;
 //
 template<class ForwardIterator1, class ForwardIterator2>
 std::pair<ForwardIterator1, ForwardIterator1>
-    find_longest_match(ForwardIterator1 first1, ForwardIterator1 last1,
-                       ForwardIterator2 first2, ForwardIterator2 last2) {
+find_longest_match(ForwardIterator1 first1, ForwardIterator1 last1,
+        ForwardIterator2 first2, ForwardIterator2 last2) {
 
     using iterator1_traits = typename std::iterator_traits<ForwardIterator1>;
 
@@ -93,19 +93,19 @@ std::pair<ForwardIterator1, ForwardIterator1>
     return std::make_pair(result, std::next(result, best_length));
 }
 
-std::size_t get_streamsize(std::ifstream& istr) {
+std::size_t get_streamsize(std::ifstream& str) {
     // save the current position of the cursor
-    const std::streampos pos{istr.tellg()};
+    const std::streampos pos{str.tellg()};
 
-    // seek to the end of the stream
-    istr.ignore(std::numeric_limits<std::streamsize>::max());
-    std::size_t size{static_cast<std::size_t>(istr.gcount())};
+    // move cursor and seek to the end of the stream, !sets EOF bit!
+    str.ignore(std::numeric_limits<std::streamsize>::max());
+    std::size_t size{static_cast<std::size_t>(str.gcount())};
 
-    // move file pointer back to the beginning of the stream
-    istr.seekg(pos, std::ios_base::beg);
+    // reset cursor to its original position
+    str.seekg(pos, std::ios_base::beg);
 
     // clear eof bit
-    istr.clear();
+    str.clear();
 
     return size;
 }
@@ -149,8 +149,8 @@ void encode_lz77(std::ifstream& input, std::ofstream& output) {
         const unsigned char token{*(std::next(look, match_length))};
 
         output << static_cast<unsigned char>(match_offset)
-               << static_cast<unsigned char>(match_length)
-               << token;
+            << static_cast<unsigned char>(match_length)
+            << token;
 
         // shift cursor (look) by match_length + 1 as required by lz77 algorithm
         // EXCEPT at the end of the file, the final shift must be match_length
@@ -191,12 +191,21 @@ void decode_lz77(std::ifstream& input, std::ofstream& output) {
 
 }
 
-void print_usage(std::string program_name) {
-    std::cerr << "Usage: " << program_name << " <option(s)>\n"
-        << "Options:\n"
-        << "\t-h,--help\t\tShow this help message\n"
-        << "\t-d,--decode FILENAME\tDecode the file\n"
-        << "\t-e,--encode FILENAME\tEncode the file\n"
+void print_usage() {
+    std::cerr << "LZ77 Compressor, version 0.1 for linux\n"
+        << "Usage: lz77 [options] ...\n"
+        << "Long options:\n"
+        << "\t\t--help\t\tShow this help message\n"
+        << "\t\t--encode\t\tEncodes a file to LZ77\n"
+        << "\t\t--decode\t\tDecodes a file from LZ77\n"
+        << "\t\t--inputfile [FILE]\t\tRead from [FILE]\n"
+        << "\t\t--outputfile [FILE]\t\tWrite to [FILE]\n"
+        << "Short options:\n"
+        << "\t\t-h\t\tSame as --help\n"
+        << "\t\t-e\t\tSame as --encode\n"
+        << "\t\t-d\t\tSame as --decode\n"
+        << "\t\t-i\t\tSame as --inputfile\n"
+        << "\t\t-o\t\tSame as --outputfile\n"
         << std::endl;
 }
 
@@ -208,21 +217,19 @@ bool file_exists(const std::filesystem::path& p,
 }
 
 int main(int argc, char** argv) {
-    static const std::string program_name{argv[0]};
-
     if (argc < 2) {
         std::cerr << "Error: this program requires an input file\n";
-        print_usage(program_name);
+        print_usage();
         return 1;
     }
 
-    int decompress_flag{0};
+    int compression_flag{0};
     std::string filename;
     std::string output_filename;
     while (true) {
         static struct option long_options[] = {
-            {"encode", no_argument, &decompress_flag, 0},
-            {"decode", no_argument, &decompress_flag, 1},
+            {"encode", no_argument, &compression_flag, 0},
+            {"decode", no_argument, &compression_flag, 1},
             {"help", no_argument, 0, 'h'},
             {"outputfile", required_argument, 0, 'o'},
             {"inputfile",  required_argument, 0, 'i'},
@@ -244,46 +251,47 @@ int main(int argc, char** argv) {
                 output_filename.assign(optarg);
                 break;
             case 'h':
-                print_usage(program_name);
+                print_usage();
                 return 1;
             case '?':
-                std::cerr << "Error: invalid command argument(s) " << optarg << '\n';
+                // if option is invalid ...
                 return 1;
             default:
-                // normally there would be an abort() here
-                // this return statement is similar
+                // abort();
                 return 1;
         }
     }
 
-    // set default output name if not explicitly set in the above switch case
+    std::ifstream input{filename, std::ios_base::binary};
+    if (!input.is_open()) {
+        std::cerr << "Error: cannot read file \"" << filename << "\" does not exist or is not readable.\n";
+        return 1;
+    }
+
     if (output_filename.empty()) {
         output_filename = filename + ".lz77";
     }
 
-    const std::filesystem::path input_filepath{filename};
-    if (!file_exists(input_filepath)) {
-        std::cerr << "Error: cannot read file. " << filename << " does not exist or is not readable.\n";
-        return 1;
-    }
-
-    const std::filesystem::path output_filepath{output_filename};
-    if (file_exists(output_filepath)) {
-        char choice;
-        std::cout << "File " << output_filename << " exists. Overwrite file? [y/N]: ";
+    const std::filesystem::path output_file{output_filename};
+    if (file_exists(output_file)) {
+        char choice{0};
+        std::cout << "File \"" << output_filename << "\" exists. Overwrite file? [y/N]: ";
         std::cin >> choice;
         if (choice == 'y' || choice == 'Y') {
-            std::filesystem::remove(output_filepath);
+            std::filesystem::remove(output_file);
         } else {
             return 1;
         }
     }
 
-    std::ifstream input{filename, std::ios_base::binary};
     std::ofstream output{output_filename, std::ios_base::binary};
+    if (!output.is_open()) {
+        std::cerr << "Error: cannot write file \"" << output_filename << "\" is not writeable.\n";
+        return 1;
+    }
 
     try {
-        switch(decompress_flag) {
+        switch(compression_flag) {
             case 0:
                 encode_lz77(input, output);
                 std::cout << "File succesfully compressed to: " << output_filename << '\n';
@@ -292,8 +300,9 @@ int main(int argc, char** argv) {
                 decode_lz77(input, output);
                 std::cout << "File succesfully decompressed to: " << output_filename << '\n';
                 break;
-            default:    // this case should ideally never happen, UNLESS there's a soft error
-                throw std::runtime_error("decompress_flag has unexpected value neither 1 or 0");
+            default:
+                // this case should never happen, UNLESS there is a programmer error or SOFT ERROR
+                throw std::runtime_error("compression_flag has unexpected value neither 1 or 0");
         }
     } catch (std::runtime_error& e) {
         std::cerr << e.what() << std::endl;
@@ -301,22 +310,3 @@ int main(int argc, char** argv) {
 
     return 0;
 }
-
-//for (auto search_it = search.begin(); search_it != search.end(); ++search_it) {
-//    auto result = find_match_run(search_it, search.end(),
-//                                 look.begin(), look.end(),
-//                                 [](auto dict, auto token){return dict == token;});
-
-//    if (result == search.end()) {
-//        continue;
-//    }
-
-//    auto length = std::distance(search_it, result);
-//    auto offset = std::distance(search_it, search.end());
-
-//    if (length > data.length || (length == data.length && offset < data.offset)) {
-//        data.length = length;
-//        data.offset = offset;
-//        data.token = *result;
-//    }
-//}
