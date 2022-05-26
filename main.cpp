@@ -245,10 +245,10 @@ int main(int argc, char** argv) {
 
         switch(opt) {
             case 'i':
-                filename.assign(optarg);
+                filename = optarg;
                 break;
             case 'o':
-                output_filename.assign(optarg);
+                output_filename = optarg;
                 break;
             case 'h':
                 print_usage();
@@ -268,15 +268,17 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    // if user did not specify an output name, assign a default output name
     if (output_filename.empty()) {
         output_filename = filename + ".lz77";
     }
 
+    // check if file already exists and overwrite the file if necessary
     const std::filesystem::path output_file{output_filename};
     if (file_exists(output_file)) {
         char choice{0};
         std::cout << "File \"" << output_filename << "\" exists. Overwrite file? [y/N]: ";
-        std::cin >> choice;
+        std::cin >> std::noskipws >> choice;
         if (choice == 'y' || choice == 'Y') {
             std::filesystem::remove(output_file);
         } else {
