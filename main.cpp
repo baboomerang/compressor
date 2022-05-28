@@ -276,13 +276,22 @@ int main(int argc, char** argv) {
     // check if file already exists and overwrite the file if necessary
     const std::filesystem::path output_file{output_filename};
     if (file_exists(output_file)) {
-        char choice{0};
+        char choice{'n'};
         std::cout << "File \"" << output_filename << "\" exists. Overwrite file? [y/N]: ";
         std::cin >> std::noskipws >> choice;
-        if (choice == 'y' || choice == 'Y') {
-            std::filesystem::remove(output_file);
-        } else {
-            return 1;
+        switch(choice) {
+            case 'y':
+            case 'Y';
+                std::filesystem::remove(output_file);
+                break;
+            case 'n';
+            case 'N';
+                // do not print or do anything. this is a safe exit
+                return 0;
+            default:
+                std::cerr << "Error: response was not 'Y' or 'N'. aborting...\n"
+                    << "No changes have been made.\n";
+                return 1;
         }
     }
 
