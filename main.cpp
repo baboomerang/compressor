@@ -281,11 +281,11 @@ int main(int argc, char** argv) {
         std::cin >> std::noskipws >> choice;
         switch(choice) {
             case 'y':
-            case 'Y';
+            case 'Y':
                 std::filesystem::remove(output_file);
                 break;
-            case 'n';
-            case 'N';
+            case 'n':
+            case 'N':
                 // do not print or do anything. this is a safe exit
                 return 0;
             default:
