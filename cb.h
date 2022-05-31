@@ -195,7 +195,7 @@ private:
         }
     }
     void increment_end() { increment_wrap(end_); ++contents_size_; }
-    void increment_start() { increment_wrap(start_); --contents_size_; }
+    void increment_start() { if (empty()) return; increment_wrap(start_); --contents_size_; }
     value_type array_[N];
     size_type array_size_;
     size_type start_;
