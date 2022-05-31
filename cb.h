@@ -170,8 +170,8 @@ public:
     constexpr const_reference operator[](size_type pos) const noexcept { return array_[pos]; }
     reference at(size_type pos) {
         if (pos >= array_size_) {
-            std::out_of_range(std::string("circular_buffer::at index: " + pos) +
-                              std::string(" is >= array size: " + array_size_));
+            throw std::out_of_range(std::string("circular_buffer::at index: " + pos) +
+                                    std::string(" is >= array size: " + array_size_));
         }
         return array_[pos];
     }
