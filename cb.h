@@ -35,7 +35,10 @@ public:
         using pointer            = value_type*;
         using reference          = value_type&;
 
-        explicit iterator(pointer ptr, size_type pos) : m_ptr(ptr), m_pos(pos) {}
+        explicit iterator(pointer ptr, size_type pos, size_type& size) :
+            m_ptr(ptr),
+            m_pos(pos),
+            m_size(size) {}
         ~iterator() = default;
 
         iterator& operator=(const iterator& rhs) {
@@ -44,10 +47,15 @@ public:
             }
             m_ptr = rhs.m_ptr;
             m_pos = rhs.m_pos;
+            m_size = rhs.m_size;
             return *this;
         }
-        bool operator==(const iterator& rhs) const { return (m_pos == rhs.m_pos) && (m_ptr == rhs.m_ptr); }
-        bool operator!=(const iterator& rhs) const { return (m_pos != rhs.m_pos) || (m_ptr != rhs.m_ptr); }
+
+        friend bool operator==(const iterator& lhs, const iterator& rhs)
+                    { return (lhs.m_pos == rhs.m_pos) && (lhs.m_ptr == rhs.m_ptr) && (lhs.m_size == rhs.m_size); }
+
+        friend bool operator!=(const iterator& lhs, const iterator& rhs)
+                    { return (lhs.m_pos != rhs.m_pos) || (lhs.m_ptr != rhs.m_ptr) || (lhs.m_size != rhs.m_size); }
 
         // Dereferencing operators
         reference operator*() const { return m_ptr[m_pos]; }
@@ -56,14 +64,14 @@ public:
         // Prefix addition and subtraction operators
         iterator& operator++() {
             ++m_pos;
-            if (m_pos == array_size_) {
+            if (m_pos == m_size) {
                 m_pos = 0;
             }
             return *this;
         }
         iterator& operator--() {
             if (m_pos == 0) {
-                m_pos = array_size_ - 1;
+                m_pos = m_size - 1;
             } else {
                 --m_pos;
             }
@@ -84,65 +92,75 @@ public:
 
         // Compound addition and subtraction operators
         iterator& operator+=(size_type length) {
-            m_pos = add_wrap(m_pos, length);
+            add_wrap(m_pos, length);
             return *this;
         }
         iterator& operator-=(size_type length) {
             size_type new_pos;
-            m_pos = subtract_wrap(m_pos, length);
+            subtract_wrap(m_pos, length);
             return *this;
         }
 
         // Binary addition and subtraction operators
         iterator operator+(size_type length) const {
             iterator tmp = *this;
-            tmp.m_pos = add_wrap(tmp.m_pos, length);
+            add_wrap(tmp.m_pos, length);
             return tmp;
         }
         iterator operator-(size_type length) const {
             iterator tmp = *this;
-            tmp.m_pos = subtract_wrap(tmp.m_pos, length);
+            subtract_wrap(tmp.m_pos, length);
             return tmp;
         }
 
     private:
-        size_type subtract_wrap(size_type pos, size_type length) {
+        void subtract_wrap(size_type& pos, size_type& length) {
             size_type new_pos;
             if (length > pos) {
-                size_type remainder = (length - pos) % array_size_;
-                new_pos = array_size_ - remainder;
+                size_type remainder = (length - pos) % m_size;
+                new_pos = m_size - remainder;
             } else {
                 new_pos = pos - length;
             }
-            return new_pos;
+            pos = new_pos;
         }
-        size_type add_wrap(size_type pos, size_type length) {
+        void add_wrap(size_type& pos, size_type& length) {
             size_type new_pos = pos + length;
-            if (new_pos >= array_size_) {
-                new_pos %= array_size_;
+            if (new_pos >= m_size) {
+                new_pos %= m_size;
             }
-            return new_pos;
+            pos = new_pos;
         }
         pointer m_ptr;
         size_type m_pos;
+        size_type& m_size;
     };
     //===========================================================================
 
-    iterator begin() noexcept {
-        return iterator(array_, start_);
-    }
+    iterator begin() noexcept { return iterator(array_, start_, array_size_); }
+    iterator end() noexcept { return iterator(array_, end_, array_size_); }
+    //const_iterator begin() { return const_iterator(array_, start_); }
+    //const_iterator end() { return const_iterator(array_, end_); }
 
-    // end() returns an iterator which is the past-the-end value for the container
-    iterator end() noexcept {
-        return iterator(array_, end_);
-    }
-
+    // TODO:
+    //       Add support for a constructor with two iterators
+    //       Add support for const iterators
+    //       Add mutexes for thread-saftey
+    //       Change c style array to unique pointer?
     circular_buffer() :
         array_{0},
-        array_size_(N),
-        start_(0),
-        end_(0),
-        contents_size_(0){}
+        array_size_{N},
+        start_{0},
+        end_{0},
+        contents_size_{0}{}
+
+    circular_buffer(std::initializer_list<value_type> il) :
+        circular_buffer()
+    {
+        for (const auto& value : il) {
+            push_back(value);
+        }
+    };
 
     ~circular_buffer(){}
 
@@ -158,14 +176,14 @@ public:
         increment_start();
     }
 
-    // Capacity
+    // Capacity functions
     constexpr size_type size() const noexcept { return contents_size_; }
     constexpr size_type capacity() const noexcept { return array_size_; }
     constexpr size_type max_size() const noexcept { return std::numeric_limits<size_type>::max(); }
     constexpr bool empty() const noexcept { return contents_size_ == 0; }
     void clear() noexcept { start_ = end_ = contents_size_ = 0; }
 
-    // Element access
+    // Element access functions
     reference operator[](size_type pos) noexcept { return array_[pos]; }
     constexpr const_reference operator[](size_type pos) const noexcept { return array_[pos]; }
     reference at(size_type pos) {
