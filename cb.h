@@ -134,8 +134,7 @@ public:
 
     // end() returns an iterator which is the past-the-end value for the container
     iterator end() noexcept {
-        size_type true_end = end_ + 1;
-        return iterator(array_, (true_end != array_size_) ? true_end : 0);
+        return iterator(array_, end_);
     }
 
     circular_buffer() :
