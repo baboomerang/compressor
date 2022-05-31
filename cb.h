@@ -51,7 +51,7 @@ public:
 
         // Dereferencing operators
         reference operator*() const { return m_ptr[m_pos]; }
-        pointer operator->() { return m_ptr + m_pos; }
+        pointer operator->() { return &(operator*()); }
 
         // Prefix addition and subtraction operators
         iterator& operator++() {
